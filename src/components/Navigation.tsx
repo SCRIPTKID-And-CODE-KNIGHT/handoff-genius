@@ -21,8 +21,8 @@ const Navigation = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 
@@ -81,8 +81,8 @@ const Navigation = () => {
           <div className="hidden md:flex items-center gap-4">
             {currentUser && (
               <div className="text-right">
-                <p className="text-sm font-medium text-foreground">{currentUser.name}</p>
-                <p className="text-xs text-muted-foreground">{currentUser.hospitalName}</p>
+                <p className="text-sm font-medium text-foreground">{currentUser.full_name}</p>
+                <p className="text-xs text-muted-foreground">{currentUser.hospital_name || 'No hospital'}</p>
               </div>
             )}
             <Button variant="ghost" size="sm" onClick={handleLogout}>
@@ -110,8 +110,8 @@ const Navigation = () => {
           <div className="px-4 py-3 space-y-1">
             {currentUser && (
               <div className="pb-3 mb-3 border-b border-border">
-                <p className="text-sm font-medium text-foreground">{currentUser.name}</p>
-                <p className="text-xs text-muted-foreground">{currentUser.hospitalName}</p>
+                <p className="text-sm font-medium text-foreground">{currentUser.full_name}</p>
+                <p className="text-xs text-muted-foreground">{currentUser.hospital_name || 'No hospital'}</p>
               </div>
             )}
             {navItems.map((item) => (

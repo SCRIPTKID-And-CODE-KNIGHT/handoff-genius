@@ -36,7 +36,7 @@ const CreateReferral = () => {
 
   if (!currentUser) return null;
 
-  const availableHospitals = hospitals.filter(h => h.id !== currentUser.hospitalId);
+  const availableHospitals = hospitals.filter(h => h.id !== currentUser.hospital_id);
 
   const selectedHospital = availableHospitals.find(h => h.id === formData.toHospitalId);
 
@@ -61,10 +61,10 @@ const CreateReferral = () => {
       reasonForReferral: formData.reasonForReferral,
       urgency: formData.urgency,
       status: 'pending',
-      fromHospitalId: currentUser.hospitalId,
-      fromHospitalName: currentUser.hospitalName,
+      fromHospitalId: currentUser.hospital_id || '',
+      fromHospitalName: currentUser.hospital_name || '',
       fromDoctorId: currentUser.id,
-      fromDoctorName: currentUser.name,
+      fromDoctorName: currentUser.full_name,
       toHospitalId: formData.toHospitalId,
       toHospitalName: targetHospital?.name || '',
       specialty: formData.specialty,

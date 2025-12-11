@@ -1,35 +1,190 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { Doctor } from '@/types/referral';
-import { mockDoctors } from '@/data/mockData';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface UserProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  hospital_id: string | null;
+  hospital_name?: string;
+  specialty: string | null;
+  role: 'doctor' | 'admin';
+}
 
 interface AuthContextType {
-  currentUser: Doctor | null;
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
+  user: User | null;
+  session: Session | null;
+  currentUser: UserProfile | null;
+  isLoading: boolean;
+  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  signup: (email: string, password: string, fullName: string, hospitalId?: string, specialty?: string) => Promise<{ error: string | null }>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<Doctor | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (email: string, password: string): boolean => {
-    // Mock authentication - in production, this would verify against backend
-    const user = mockDoctors.find(d => d.email.toLowerCase() === email.toLowerCase());
-    if (user && password === 'demo123') {
-      setCurrentUser(user);
-      return true;
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      // Fetch profile
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*, hospitals(name)')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        return null;
+      }
+
+      if (!profile) return null;
+
+      // Fetch role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (roleError) {
+        console.error('Error fetching role:', roleError);
+      }
+
+      const userProfile: UserProfile = {
+        id: profile.id,
+        full_name: profile.full_name,
+        email: profile.email,
+        hospital_id: profile.hospital_id,
+        hospital_name: (profile.hospitals as any)?.name || undefined,
+        specialty: profile.specialty,
+        role: (roleData?.role as 'doctor' | 'admin') || 'doctor',
+      };
+
+      return userProfile;
+    } catch (error) {
+      console.error('Error in fetchUserProfile:', error);
+      return null;
     }
-    return false;
   };
 
-  const logout = () => {
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        // Defer profile fetch with setTimeout to avoid deadlock
+        if (session?.user) {
+          setTimeout(() => {
+            fetchUserProfile(session.user.id).then(setCurrentUser);
+          }, 0);
+        } else {
+          setCurrentUser(null);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserProfile(session.user.id).then((profile) => {
+          setCurrentUser(profile);
+          setIsLoading(false);
+        });
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const login = async (email: string, password: string): Promise<{ error: string | null }> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      return { error: error.message };
+    }
+    return { error: null };
+  };
+
+  const signup = async (
+    email: string, 
+    password: string, 
+    fullName: string,
+    hospitalId?: string,
+    specialty?: string
+  ): Promise<{ error: string | null }> => {
+    const redirectUrl = `${window.location.origin}/`;
+    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectUrl,
+      }
+    });
+
+    if (error) {
+      return { error: error.message };
+    }
+
+    if (data.user) {
+      // Create profile
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: data.user.id,
+        email,
+        full_name: fullName,
+        hospital_id: hospitalId || null,
+        specialty: specialty || null,
+      });
+
+      if (profileError) {
+        console.error('Profile creation error:', profileError);
+        return { error: 'Account created but profile setup failed. Please contact support.' };
+      }
+
+      // Add default doctor role
+      const { error: roleError } = await supabase.from('user_roles').insert({
+        user_id: data.user.id,
+        role: 'doctor',
+      });
+
+      if (roleError) {
+        console.error('Role assignment error:', roleError);
+      }
+    }
+
+    return { error: null };
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, logout, isAuthenticated: !!currentUser }}>
+    <AuthContext.Provider value={{ 
+      user,
+      session,
+      currentUser, 
+      isLoading,
+      login, 
+      signup,
+      logout, 
+      isAuthenticated: !!user 
+    }}>
       {children}
     </AuthContext.Provider>
   );

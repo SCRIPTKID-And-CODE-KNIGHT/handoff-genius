@@ -15,7 +15,7 @@ const SentReferrals = () => {
   if (!currentUser) return null;
 
   const sentReferrals = referrals
-    .filter(r => r.fromHospitalId === currentUser.hospitalId)
+    .filter(r => r.fromHospitalId === currentUser.hospital_id)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   const pendingReferrals = sentReferrals.filter(r => r.status === 'pending' || r.status === 'more_info_requested');

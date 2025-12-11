@@ -22,8 +22,8 @@ const Dashboard = () => {
 
   if (!currentUser) return null;
 
-  const sentReferrals = referrals.filter(r => r.fromHospitalId === currentUser.hospitalId);
-  const incomingReferrals = referrals.filter(r => r.toHospitalId === currentUser.hospitalId);
+  const sentReferrals = referrals.filter(r => r.fromHospitalId === currentUser.hospital_id);
+  const incomingReferrals = referrals.filter(r => r.toHospitalId === currentUser.hospital_id);
   
   const pendingIncoming = incomingReferrals.filter(r => r.status === 'pending');
   const inTreatment = incomingReferrals.filter(r => r.status === 'in_treatment' || r.status === 'accepted');
@@ -48,10 +48,10 @@ const Dashboard = () => {
         {/* Welcome Section */}
         <div className="mb-8 animate-fade-in">
           <h1 className="text-2xl font-bold text-foreground">
-            Welcome back, {currentUser.name.split(' ')[1]}
+            Welcome back, {currentUser.full_name.split(' ')[1] || currentUser.full_name}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {currentUser.hospitalName} • {currentUser.specialty}
+            {currentUser.hospital_name || 'No hospital'} • {currentUser.specialty || 'General'}
           </p>
         </div>
 
@@ -134,7 +134,7 @@ const Dashboard = () => {
                 <ReferralCard 
                   key={referral.id} 
                   referral={referral}
-                  showFromHospital={referral.toHospitalId === currentUser.hospitalId}
+                  showFromHospital={referral.toHospitalId === currentUser.hospital_id}
                 />
               ))
             ) : (

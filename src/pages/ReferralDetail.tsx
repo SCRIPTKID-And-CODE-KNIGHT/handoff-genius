@@ -59,14 +59,14 @@ const ReferralDetail = () => {
     );
   }
 
-  const isReceivingHospital = referral.toHospitalId === currentUser.hospitalId;
-  const isSendingHospital = referral.fromHospitalId === currentUser.hospitalId;
+  const isReceivingHospital = referral.toHospitalId === currentUser.hospital_id;
+  const isSendingHospital = referral.fromHospitalId === currentUser.hospital_id;
   const canTakeAction = isReceivingHospital && (referral.status === 'pending' || referral.status === 'accepted' || referral.status === 'in_treatment');
 
   const handleAction = (action: 'accept' | 'reject' | 'more_info' | 'complete') => {
     setCurrentAction(action);
     if (action === 'accept') {
-      updateReferralStatus(referral.id, 'accepted', currentUser.name);
+      updateReferralStatus(referral.id, 'accepted', currentUser.full_name);
       toast.success('Referral accepted');
     } else {
       setDialogOpen(true);
@@ -78,15 +78,15 @@ const ReferralDetail = () => {
 
     switch (currentAction) {
       case 'reject':
-        updateReferralStatus(referral.id, 'rejected', currentUser.name, actionReason);
+        updateReferralStatus(referral.id, 'rejected', currentUser.full_name, actionReason);
         toast.success('Referral rejected');
         break;
       case 'more_info':
-        updateReferralStatus(referral.id, 'more_info_requested', currentUser.name, actionReason);
+        updateReferralStatus(referral.id, 'more_info_requested', currentUser.full_name, actionReason);
         toast.success('Additional information requested');
         break;
       case 'complete':
-        completeReferral(referral.id, currentUser.name, actionReason);
+        completeReferral(referral.id, currentUser.full_name, actionReason);
         toast.success('Treatment marked as complete. Patient code generated!');
         break;
     }
@@ -104,7 +104,7 @@ const ReferralDetail = () => {
   };
 
   const startTreatment = () => {
-    updateReferralStatus(referral.id, 'in_treatment', currentUser.name, 'Treatment started');
+    updateReferralStatus(referral.id, 'in_treatment', currentUser.full_name, 'Treatment started');
     toast.success('Treatment started');
   };
 

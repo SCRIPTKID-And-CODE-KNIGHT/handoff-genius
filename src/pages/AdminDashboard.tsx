@@ -1,11 +1,8 @@
-import { useState } from 'react';
-import { useReferrals } from '@/contexts/ReferralContext';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import Navigation from '@/components/Navigation';
-import ReferralCard from '@/components/ReferralCard';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
-import { hospitals, mockDoctors } from '@/data/mockData';
-import { Hospital, Doctor } from '@/types/referral';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,18 +19,38 @@ import {
   FileText, 
   Plus, 
   Search,
-  TrendingUp,
   Clock,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+import { Database } from '@/integrations/supabase/types';
+
+type DbHospital = Database['public']['Tables']['hospitals']['Row'];
+type DbProfile = Database['public']['Tables']['profiles']['Row'];
+type DbReferral = Database['public']['Tables']['referrals']['Row'];
+type DbUserRole = Database['public']['Tables']['user_roles']['Row'];
+
+interface Hospital extends DbHospital {}
+
+interface Profile extends DbProfile {
+  hospital_name?: string;
+  role?: string;
+}
+
+interface Referral extends DbReferral {
+  from_hospital_name?: string;
+  to_hospital_name?: string;
+}
 
 const AdminDashboard = () => {
-  const { currentUser } = useAuth();
-  const { referrals } = useReferrals();
-  const [hospitalsList, setHospitalsList] = useState<Hospital[]>(hospitals);
-  const [doctorsList, setDoctorsList] = useState<Doctor[]>(mockDoctors);
+  const { currentUser, isLoading: authLoading } = useAuth();
+  const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [doctors, setDoctors] = useState<Profile[]>([]);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [userRoles, setUserRoles] = useState<DbUserRole[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
@@ -41,21 +58,91 @@ const AdminDashboard = () => {
   const [addHospitalOpen, setAddHospitalOpen] = useState(false);
   const [newHospital, setNewHospital] = useState({
     name: '',
-    city: '',
-    specialty: ''
+    address: '',
+    phone: '',
+    email: ''
   });
+  const [addingHospital, setAddingHospital] = useState(false);
 
   // Add Doctor Dialog State
   const [addDoctorOpen, setAddDoctorOpen] = useState(false);
   const [newDoctor, setNewDoctor] = useState({
-    name: '',
     email: '',
+    password: '',
+    fullName: '',
     hospitalId: '',
     specialty: '',
     role: 'doctor' as 'doctor' | 'admin'
   });
+  const [addingDoctor, setAddingDoctor] = useState(false);
+
+  // Fetch data
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      
+      // Fetch hospitals
+      const { data: hospitalsData } = await supabase
+        .from('hospitals')
+        .select('*')
+        .order('name');
+      
+      // Fetch profiles
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('full_name');
+
+      // Fetch user roles
+      const { data: rolesData } = await supabase
+        .from('user_roles')
+        .select('*');
+      
+      // Fetch referrals
+      const { data: referralsData } = await supabase
+        .from('referrals')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      const hospitalsMap = new Map((hospitalsData || []).map(h => [h.id, h.name]));
+      
+      // Enrich profiles with hospital names and roles
+      const enrichedProfiles: Profile[] = (profilesData || []).map(profile => {
+        const role = (rolesData || []).find(r => r.user_id === profile.id);
+        return {
+          ...profile,
+          hospital_name: profile.hospital_id ? hospitalsMap.get(profile.hospital_id) : undefined,
+          role: role?.role || 'doctor'
+        };
+      });
+
+      // Enrich referrals with hospital names
+      const enrichedReferrals: Referral[] = (referralsData || []).map(referral => ({
+        ...referral,
+        from_hospital_name: hospitalsMap.get(referral.from_hospital_id),
+        to_hospital_name: hospitalsMap.get(referral.to_hospital_id)
+      }));
+
+      if (hospitalsData) setHospitals(hospitalsData);
+      setDoctors(enrichedProfiles);
+      if (rolesData) setUserRoles(rolesData);
+      setReferrals(enrichedReferrals);
+      
+      setIsLoading(false);
+    };
+
+    fetchData();
+  }, []);
 
   // Redirect if not admin
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   if (currentUser?.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
@@ -66,61 +153,134 @@ const AdminDashboard = () => {
     pendingReferrals: referrals.filter(r => r.status === 'pending').length,
     completedReferrals: referrals.filter(r => r.status === 'completed').length,
     emergencyReferrals: referrals.filter(r => r.urgency === 'emergency').length,
-    totalHospitals: hospitalsList.length,
-    totalDoctors: doctorsList.filter(d => d.role === 'doctor').length
+    totalHospitals: hospitals.length,
+    totalDoctors: doctors.filter(d => d.role === 'doctor').length
   };
 
   // Filter referrals
   const filteredReferrals = referrals.filter(referral => {
     const matchesSearch = 
-      referral.patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      referral.fromHospitalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      referral.toHospitalName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      referral.patientCode?.toLowerCase().includes(searchTerm.toLowerCase());
+      referral.patient_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      referral.from_hospital_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      referral.to_hospital_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      referral.patient_code?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || referral.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   // Add Hospital Handler
-  const handleAddHospital = () => {
-    if (!newHospital.name || !newHospital.city) {
-      toast.error('Please fill in all required fields');
+  const handleAddHospital = async () => {
+    if (!newHospital.name) {
+      toast.error('Hospital name is required');
       return;
     }
 
-    const hospital: Hospital = {
-      id: `h${hospitalsList.length + 1}`,
-      name: newHospital.name,
-      city: newHospital.city,
-      specialty: newHospital.specialty.split(',').map(s => s.trim()).filter(Boolean)
-    };
+    setAddingHospital(true);
+    
+    const { data, error } = await supabase
+      .from('hospitals')
+      .insert({
+        name: newHospital.name,
+        address: newHospital.address || null,
+        phone: newHospital.phone || null,
+        email: newHospital.email || null
+      })
+      .select()
+      .single();
 
-    setHospitalsList([...hospitalsList, hospital]);
-    setNewHospital({ name: '', city: '', specialty: '' });
+    setAddingHospital(false);
+
+    if (error) {
+      toast.error('Failed to add hospital: ' + error.message);
+      return;
+    }
+
+    setHospitals([...hospitals, data]);
+    setNewHospital({ name: '', address: '', phone: '', email: '' });
     setAddHospitalOpen(false);
     toast.success('Hospital added successfully');
   };
 
   // Add Doctor Handler
-  const handleAddDoctor = () => {
-    if (!newDoctor.name || !newDoctor.email || !newDoctor.hospitalId || !newDoctor.specialty) {
-      toast.error('Please fill in all required fields');
+  const handleAddDoctor = async () => {
+    if (!newDoctor.email || !newDoctor.password || !newDoctor.fullName) {
+      toast.error('Email, password, and full name are required');
       return;
     }
 
-    const hospital = hospitalsList.find(h => h.id === newDoctor.hospitalId);
-    const doctor: Doctor = {
-      id: `d${doctorsList.length + 1}`,
-      name: newDoctor.name,
-      email: newDoctor.email,
-      hospitalId: newDoctor.hospitalId,
-      hospitalName: hospital?.name || '',
-      specialty: newDoctor.specialty,
-      role: newDoctor.role
-    };
+    setAddingDoctor(true);
 
-    setDoctorsList([...doctorsList, doctor]);
-    setNewDoctor({ name: '', email: '', hospitalId: '', specialty: '', role: 'doctor' });
+    // Create auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: newDoctor.email,
+      password: newDoctor.password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      }
+    });
+
+    if (authError) {
+      toast.error('Failed to create user: ' + authError.message);
+      setAddingDoctor(false);
+      return;
+    }
+
+    if (!authData.user) {
+      toast.error('Failed to create user');
+      setAddingDoctor(false);
+      return;
+    }
+
+    // Create profile
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: authData.user.id,
+      email: newDoctor.email,
+      full_name: newDoctor.fullName,
+      hospital_id: newDoctor.hospitalId || null,
+      specialty: newDoctor.specialty || null,
+    });
+
+    if (profileError) {
+      toast.error('Failed to create profile: ' + profileError.message);
+      setAddingDoctor(false);
+      return;
+    }
+
+    // Assign role
+    const { error: roleError } = await supabase.from('user_roles').insert({
+      user_id: authData.user.id,
+      role: newDoctor.role,
+    });
+
+    if (roleError) {
+      toast.error('Failed to assign role: ' + roleError.message);
+    }
+
+    // Refresh doctors list
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('full_name');
+
+    const { data: rolesData } = await supabase
+      .from('user_roles')
+      .select('*');
+
+    const hospitalsMap = new Map(hospitals.map(h => [h.id, h.name]));
+    
+    const enrichedProfiles: Profile[] = (profilesData || []).map(profile => {
+      const role = (rolesData || []).find(r => r.user_id === profile.id);
+      return {
+        ...profile,
+        hospital_name: profile.hospital_id ? hospitalsMap.get(profile.hospital_id) : undefined,
+        role: role?.role || 'doctor'
+      };
+    });
+
+    setDoctors(enrichedProfiles);
+
+    setAddingDoctor(false);
+    setNewDoctor({ email: '', password: '', fullName: '', hospitalId: '', specialty: '', role: 'doctor' });
     setAddDoctorOpen(false);
     toast.success('Doctor added successfully');
   };
@@ -211,7 +371,7 @@ const AdminDashboard = () => {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-accent/10">
-                  <Users className="w-5 h-5 text-accent" />
+                  <Users className="w-5 h-5 text-accent-foreground" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{stats.totalDoctors}</p>
@@ -275,58 +435,62 @@ const AdminDashboard = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Patient</TableHead>
-                        <TableHead>From Hospital</TableHead>
-                        <TableHead>To Hospital</TableHead>
-                        <TableHead>Specialty</TableHead>
-                        <TableHead>Urgency</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Code</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredReferrals.length === 0 ? (
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                            No referrals found
-                          </TableCell>
+                          <TableHead>Patient</TableHead>
+                          <TableHead>From Hospital</TableHead>
+                          <TableHead>To Hospital</TableHead>
+                          <TableHead>Urgency</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Code</TableHead>
                         </TableRow>
-                      ) : (
-                        filteredReferrals.map((referral) => (
-                          <TableRow key={referral.id}>
-                            <TableCell className="font-medium">{referral.patient.name}</TableCell>
-                            <TableCell>{referral.fromHospitalName}</TableCell>
-                            <TableCell>{referral.toHospitalName}</TableCell>
-                            <TableCell>{referral.specialty}</TableCell>
-                            <TableCell>
-                              <UrgencyBadge urgency={referral.urgency} />
-                            </TableCell>
-                            <TableCell>
-                              <StatusBadge status={referral.status} />
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {referral.createdAt.toLocaleDateString()}
-                            </TableCell>
-                            <TableCell>
-                              {referral.patientCode ? (
-                                <code className="bg-muted px-2 py-1 rounded text-xs font-mono">
-                                  {referral.patientCode}
-                                </code>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
-                              )}
+                      </TableHeader>
+                      <TableBody>
+                        {filteredReferrals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                              No referrals found
                             </TableCell>
                           </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
+                        ) : (
+                          filteredReferrals.map((referral) => (
+                            <TableRow key={referral.id}>
+                              <TableCell className="font-medium">{referral.patient_name}</TableCell>
+                              <TableCell>{referral.from_hospital_name || '—'}</TableCell>
+                              <TableCell>{referral.to_hospital_name || '—'}</TableCell>
+                              <TableCell>
+                                <UrgencyBadge urgency={referral.urgency} />
+                              </TableCell>
+                              <TableCell>
+                                <StatusBadge status={referral.status} />
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {new Date(referral.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                {referral.patient_code ? (
+                                  <code className="bg-muted px-2 py-1 rounded text-xs font-mono">
+                                    {referral.patient_code}
+                                  </code>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -365,21 +529,31 @@ const AdminDashboard = () => {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="hospital-city">City *</Label>
+                          <Label htmlFor="hospital-address">Address</Label>
                           <Input
-                            id="hospital-city"
-                            placeholder="e.g., San Francisco"
-                            value={newHospital.city}
-                            onChange={(e) => setNewHospital({ ...newHospital, city: e.target.value })}
+                            id="hospital-address"
+                            placeholder="e.g., 123 Medical Drive"
+                            value={newHospital.address}
+                            onChange={(e) => setNewHospital({ ...newHospital, address: e.target.value })}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="hospital-specialty">Specialties (comma-separated)</Label>
+                          <Label htmlFor="hospital-phone">Phone</Label>
                           <Input
-                            id="hospital-specialty"
-                            placeholder="e.g., Cardiology, Oncology, Neurology"
-                            value={newHospital.specialty}
-                            onChange={(e) => setNewHospital({ ...newHospital, specialty: e.target.value })}
+                            id="hospital-phone"
+                            placeholder="e.g., (555) 123-4567"
+                            value={newHospital.phone}
+                            onChange={(e) => setNewHospital({ ...newHospital, phone: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="hospital-email">Email</Label>
+                          <Input
+                            id="hospital-email"
+                            type="email"
+                            placeholder="e.g., info@hospital.com"
+                            value={newHospital.email}
+                            onChange={(e) => setNewHospital({ ...newHospital, email: e.target.value })}
                           />
                         </div>
                       </div>
@@ -387,56 +561,63 @@ const AdminDashboard = () => {
                         <Button variant="outline" onClick={() => setAddHospitalOpen(false)}>
                           Cancel
                         </Button>
-                        <Button onClick={handleAddHospital}>Add Hospital</Button>
+                        <Button onClick={handleAddHospital} disabled={addingHospital}>
+                          {addingHospital ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Add Hospital
+                        </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Hospital Name</TableHead>
-                        <TableHead>City</TableHead>
-                        <TableHead>Specialties</TableHead>
-                        <TableHead>Referrals (In/Out)</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {hospitalsList.map((hospital) => {
-                        const incomingCount = referrals.filter(r => r.toHospitalId === hospital.id).length;
-                        const outgoingCount = referrals.filter(r => r.fromHospitalId === hospital.id).length;
-                        return (
-                          <TableRow key={hospital.id}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                <Building2 className="w-4 h-4 text-primary" />
-                                {hospital.name}
-                              </div>
-                            </TableCell>
-                            <TableCell>{hospital.city}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {hospital.specialty.map((spec) => (
-                                  <Badge key={spec} variant="secondary" className="text-xs">
-                                    {spec}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <span className="text-success">{incomingCount} in</span>
-                              {' / '}
-                              <span className="text-info">{outgoingCount} out</span>
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Hospital Name</TableHead>
+                          <TableHead>Address</TableHead>
+                          <TableHead>Phone</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Referrals (In/Out)</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {hospitals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              No hospitals found
                             </TableCell>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                        ) : (
+                          hospitals.map((hospital) => {
+                            const incomingCount = referrals.filter(r => r.to_hospital_id === hospital.id).length;
+                            const outgoingCount = referrals.filter(r => r.from_hospital_id === hospital.id).length;
+                            return (
+                              <TableRow key={hospital.id}>
+                                <TableCell className="font-medium">{hospital.name}</TableCell>
+                                <TableCell>{hospital.address || '—'}</TableCell>
+                                <TableCell>{hospital.phone || '—'}</TableCell>
+                                <TableCell>{hospital.email || '—'}</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-2">
+                                    <Badge variant="secondary">{incomingCount} in</Badge>
+                                    <Badge variant="outline">{outgoingCount} out</Badge>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -448,7 +629,7 @@ const AdminDashboard = () => {
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                   <div>
                     <CardTitle>Registered Doctors</CardTitle>
-                    <CardDescription>Manage physician accounts and credentials</CardDescription>
+                    <CardDescription>Manage healthcare professionals in the network</CardDescription>
                   </div>
                   <Dialog open={addDoctorOpen} onOpenChange={setAddDoctorOpen}>
                     <DialogTrigger asChild>
@@ -461,7 +642,7 @@ const AdminDashboard = () => {
                       <DialogHeader>
                         <DialogTitle>Add New Doctor</DialogTitle>
                         <DialogDescription>
-                          Register a new physician in the referral system
+                          Create a new doctor account in the system
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
@@ -470,8 +651,8 @@ const AdminDashboard = () => {
                           <Input
                             id="doctor-name"
                             placeholder="e.g., Dr. Jane Smith"
-                            value={newDoctor.name}
-                            onChange={(e) => setNewDoctor({ ...newDoctor, name: e.target.value })}
+                            value={newDoctor.fullName}
+                            onChange={(e) => setNewDoctor({ ...newDoctor, fullName: e.target.value })}
                           />
                         </div>
                         <div className="space-y-2">
@@ -479,22 +660,32 @@ const AdminDashboard = () => {
                           <Input
                             id="doctor-email"
                             type="email"
-                            placeholder="e.g., jane.smith@hospital.com"
+                            placeholder="e.g., doctor@hospital.com"
                             value={newDoctor.email}
                             onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="doctor-hospital">Hospital *</Label>
+                          <Label htmlFor="doctor-password">Password *</Label>
+                          <Input
+                            id="doctor-password"
+                            type="password"
+                            placeholder="Create a password"
+                            value={newDoctor.password}
+                            onChange={(e) => setNewDoctor({ ...newDoctor, password: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="doctor-hospital">Hospital</Label>
                           <Select 
                             value={newDoctor.hospitalId} 
                             onValueChange={(value) => setNewDoctor({ ...newDoctor, hospitalId: value })}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select hospital" />
+                              <SelectValue placeholder="Select a hospital" />
                             </SelectTrigger>
                             <SelectContent>
-                              {hospitalsList.map((hospital) => (
+                              {hospitals.map((hospital) => (
                                 <SelectItem key={hospital.id} value={hospital.id}>
                                   {hospital.name}
                                 </SelectItem>
@@ -503,7 +694,7 @@ const AdminDashboard = () => {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="doctor-specialty">Specialty *</Label>
+                          <Label htmlFor="doctor-specialty">Specialty</Label>
                           <Input
                             id="doctor-specialty"
                             placeholder="e.g., Cardiology"
@@ -518,7 +709,7 @@ const AdminDashboard = () => {
                             onValueChange={(value: 'doctor' | 'admin') => setNewDoctor({ ...newDoctor, role: value })}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
+                              <SelectValue placeholder="Select a role" />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="doctor">Doctor</SelectItem>
@@ -531,50 +722,58 @@ const AdminDashboard = () => {
                         <Button variant="outline" onClick={() => setAddDoctorOpen(false)}>
                           Cancel
                         </Button>
-                        <Button onClick={handleAddDoctor}>Add Doctor</Button>
+                        <Button onClick={handleAddDoctor} disabled={addingDoctor}>
+                          {addingDoctor ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Add Doctor
+                        </Button>
                       </DialogFooter>
                     </DialogContent>
                   </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="rounded-lg border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Hospital</TableHead>
-                        <TableHead>Specialty</TableHead>
-                        <TableHead>Role</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {doctorsList.map((doctor) => (
-                        <TableRow key={doctor.id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="text-sm font-medium text-primary">
-                                  {doctor.name.split(' ').slice(-1)[0][0]}
-                                </span>
-                              </div>
-                              {doctor.name}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{doctor.email}</TableCell>
-                          <TableCell>{doctor.hospitalName}</TableCell>
-                          <TableCell>{doctor.specialty}</TableCell>
-                          <TableCell>
-                            <Badge variant={doctor.role === 'admin' ? 'default' : 'secondary'}>
-                              {doctor.role}
-                            </Badge>
-                          </TableCell>
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="rounded-lg border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Hospital</TableHead>
+                          <TableHead>Specialty</TableHead>
+                          <TableHead>Role</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {doctors.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              No doctors found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          doctors.map((doctor) => (
+                            <TableRow key={doctor.id}>
+                              <TableCell className="font-medium">{doctor.full_name}</TableCell>
+                              <TableCell>{doctor.email}</TableCell>
+                              <TableCell>{doctor.hospital_name || '—'}</TableCell>
+                              <TableCell>{doctor.specialty || '—'}</TableCell>
+                              <TableCell>
+                                <Badge variant={doctor.role === 'admin' ? 'default' : 'secondary'}>
+                                  {doctor.role || 'doctor'}
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
