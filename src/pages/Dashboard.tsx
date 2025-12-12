@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useReferrals } from '@/contexts/ReferralContext';
+import { useReferrals } from '@/hooks/useReferrals';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -8,17 +8,17 @@ import {
   Inbox, 
   CheckCircle, 
   Clock, 
-  AlertTriangle,
   ArrowRight,
   FileText,
-  Activity
+  Activity,
+  Loader2
 } from 'lucide-react';
 import ReferralCard from '@/components/ReferralCard';
 import Navigation from '@/components/Navigation';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
-  const { referrals } = useReferrals();
+  const { referrals, loading } = useReferrals();
 
   if (!currentUser) return null;
 
@@ -39,6 +39,17 @@ const Dashboard = () => {
   const recentReferrals = [...sentReferrals, ...incomingReferrals]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 3);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

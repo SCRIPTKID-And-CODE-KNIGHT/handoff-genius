@@ -1,46 +1,76 @@
 import { useState } from 'react';
-import { useReferrals } from '@/contexts/ReferralContext';
+import { supabase } from '@/integrations/supabase/client';
 import Navigation from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, FileText, Building2, Calendar, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, FileText, Building2, Calendar, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface ReferralSummary {
+  patientCode: string;
+  dates: { created: Date; completed?: Date };
+  hospitalsInvolved: string[];
+  specialty: string;
+  outcome: string;
+}
+
 const CodeLookup = () => {
-  const { getReferralByCode } = useReferrals();
   const [searchCode, setSearchCode] = useState('');
   const [searchResult, setSearchResult] = useState<'idle' | 'found' | 'not_found'>('idle');
-  const [referralData, setReferralData] = useState<{
-    patientCode: string;
-    dates: { created: Date; completed?: Date };
-    hospitalsInvolved: string[];
-    specialty: string;
-    outcome: string;
-  } | null>(null);
+  const [referralData, setReferralData] = useState<ReferralSummary | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!searchCode.trim()) return;
 
-    const referral = getReferralByCode(searchCode.trim());
+    setIsSearching(true);
 
-    if (referral && referral.patientCode) {
-      setReferralData({
-        patientCode: referral.patientCode,
-        dates: {
-          created: referral.createdAt,
-          completed: referral.completedAt,
-        },
-        hospitalsInvolved: [referral.fromHospitalName, referral.toHospitalName],
-        specialty: referral.specialty,
-        outcome: referral.status === 'completed' ? 'Treatment Completed Successfully' : 'In Progress',
-      });
-      setSearchResult('found');
-    } else {
+    try {
+      // Search for referral by patient code
+      const { data: referral, error } = await supabase
+        .from('referrals')
+        .select('*')
+        .ilike('patient_code', searchCode.trim())
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (referral) {
+        // Fetch hospital names
+        const { data: hospitals } = await supabase
+          .from('hospitals')
+          .select('id, name')
+          .in('id', [referral.from_hospital_id, referral.to_hospital_id]);
+
+        const hospitalMap = new Map(hospitals?.map(h => [h.id, h.name]) || []);
+
+        setReferralData({
+          patientCode: referral.patient_code || '',
+          dates: {
+            created: new Date(referral.created_at),
+            completed: referral.status === 'completed' ? new Date(referral.updated_at) : undefined,
+          },
+          hospitalsInvolved: [
+            hospitalMap.get(referral.from_hospital_id) || 'Unknown Hospital',
+            hospitalMap.get(referral.to_hospital_id) || 'Unknown Hospital',
+          ],
+          specialty: 'General',
+          outcome: referral.status === 'completed' ? 'Treatment Completed Successfully' : 'In Progress',
+        });
+        setSearchResult('found');
+      } else {
+        setReferralData(null);
+        setSearchResult('not_found');
+      }
+    } catch (error) {
+      console.error('Error searching referral:', error);
       setReferralData(null);
       setSearchResult('not_found');
+    } finally {
+      setIsSearching(false);
     }
   };
 
@@ -74,9 +104,15 @@ const CodeLookup = () => {
                   className="pl-10 font-mono"
                 />
               </div>
-              <Button type="submit">
-                <Search className="w-4 h-4 mr-2" />
-                Lookup
+              <Button type="submit" disabled={isSearching}>
+                {isSearching ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Search className="w-4 h-4 mr-2" />
+                    Lookup
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>

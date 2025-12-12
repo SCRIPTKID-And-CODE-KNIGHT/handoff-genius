@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useReferrals } from '@/contexts/ReferralContext';
-import { hospitals } from '@/data/mockData';
+import { useReferrals } from '@/hooks/useReferrals';
+import { useHospitals } from '@/hooks/useHospitals';
 import Navigation from '@/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,12 +12,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { toast } from 'sonner';
-import { ArrowLeft, Send, AlertTriangle, Clock, CheckCircle } from 'lucide-react';
-import { UrgencyLevel } from '@/types/referral';
+import { ArrowLeft, Send, AlertTriangle, Clock, CheckCircle, Loader2 } from 'lucide-react';
+
+type UrgencyLevel = 'emergency' | 'urgent' | 'routine';
 
 const CreateReferral = () => {
   const { currentUser } = useAuth();
   const { addReferral } = useReferrals();
+  const { hospitals, loading: hospitalsLoading } = useHospitals();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
@@ -28,7 +30,6 @@ const CreateReferral = () => {
     medicalSummary: '',
     reasonForReferral: '',
     toHospitalId: '',
-    specialty: '',
     urgency: 'routine' as UrgencyLevel,
   });
 
@@ -38,43 +39,32 @@ const CreateReferral = () => {
 
   const availableHospitals = hospitals.filter(h => h.id !== currentUser.hospital_id);
 
-  const selectedHospital = availableHospitals.find(h => h.id === formData.toHospitalId);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!currentUser.hospital_id) {
+      toast.error('You must be assigned to a hospital to create referrals');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const targetHospital = hospitals.find(h => h.id === formData.toHospitalId);
-
-    addReferral({
-      patient: {
-        id: `p-${Date.now()}`,
-        name: formData.patientName,
-        age: parseInt(formData.patientAge),
-        contact: formData.patientContact,
-        medicalId: formData.medicalId,
-      },
+    const result = await addReferral({
+      patientName: formData.patientName,
+      patientAge: parseInt(formData.patientAge),
+      patientContact: formData.patientContact,
+      patientMedicalId: formData.medicalId,
       medicalSummary: formData.medicalSummary,
-      reasonForReferral: formData.reasonForReferral,
-      urgency: formData.urgency,
-      status: 'pending',
-      fromHospitalId: currentUser.hospital_id || '',
-      fromHospitalName: currentUser.hospital_name || '',
-      fromDoctorId: currentUser.id,
-      fromDoctorName: currentUser.full_name,
+      reason: formData.reasonForReferral,
       toHospitalId: formData.toHospitalId,
-      toHospitalName: targetHospital?.name || '',
-      specialty: formData.specialty,
+      urgency: formData.urgency,
     });
 
     setIsSubmitting(false);
-    toast.success('Referral created successfully!', {
-      description: `Sent to ${targetHospital?.name}`,
-    });
-    navigate('/sent-referrals');
+
+    if (result) {
+      navigate('/sent-referrals');
+    }
   };
 
   const urgencyOptions = [
@@ -203,45 +193,24 @@ const CreateReferral = () => {
                   Referral Details
                 </h3>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Destination Hospital</Label>
-                    <Select
-                      value={formData.toHospitalId}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, toHospitalId: value, specialty: '' }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select hospital" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableHospitals.map((hospital) => (
-                          <SelectItem key={hospital.id} value={hospital.id}>
-                            {hospital.name} ({hospital.city})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Specialty Required</Label>
-                    <Select
-                      value={formData.specialty}
-                      onValueChange={(value) => setFormData(prev => ({ ...prev, specialty: value }))}
-                      disabled={!selectedHospital}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={selectedHospital ? "Select specialty" : "Select hospital first"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {selectedHospital?.specialty.map((spec) => (
-                          <SelectItem key={spec} value={spec}>
-                            {spec}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Destination Hospital</Label>
+                  <Select
+                    value={formData.toHospitalId}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, toHospitalId: value }))}
+                    disabled={hospitalsLoading}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={hospitalsLoading ? "Loading hospitals..." : "Select hospital"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableHospitals.map((hospital) => (
+                        <SelectItem key={hospital.id} value={hospital.id}>
+                          {hospital.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-3">
@@ -288,10 +257,17 @@ const CreateReferral = () => {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isSubmitting || !formData.toHospitalId || !formData.specialty}
+                  disabled={isSubmitting || !formData.toHospitalId}
                   className="flex-1"
                 >
-                  {isSubmitting ? 'Submitting...' : 'Submit Referral'}
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Referral'
+                  )}
                 </Button>
               </div>
             </form>

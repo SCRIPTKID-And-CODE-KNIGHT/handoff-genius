@@ -1,14 +1,14 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useReferrals } from '@/contexts/ReferralContext';
+import { useReferrals } from '@/hooks/useReferrals';
 import Navigation from '@/components/Navigation';
 import ReferralCard from '@/components/ReferralCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Inbox, AlertCircle } from 'lucide-react';
+import { Inbox, AlertCircle, Loader2 } from 'lucide-react';
 
 const IncomingReferrals = () => {
   const { currentUser } = useAuth();
-  const { referrals } = useReferrals();
+  const { referrals, loading } = useReferrals();
 
   if (!currentUser) return null;
 
@@ -19,6 +19,17 @@ const IncomingReferrals = () => {
   const pendingReferrals = incomingReferrals.filter(r => r.status === 'pending');
   const activeReferrals = incomingReferrals.filter(r => r.status === 'accepted' || r.status === 'in_treatment');
   const completedReferrals = incomingReferrals.filter(r => r.status === 'completed' || r.status === 'rejected');
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

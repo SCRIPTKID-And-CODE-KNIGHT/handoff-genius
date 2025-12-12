@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useReferrals } from '@/contexts/ReferralContext';
+import { useReferrals } from '@/hooks/useReferrals';
 import Navigation from '@/components/Navigation';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import ActivityTimeline from '@/components/ActivityTimeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   ArrowLeft, 
   Building2, 
@@ -20,7 +20,8 @@ import {
   XCircle,
   MessageSquare,
   Copy,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -29,15 +30,27 @@ const ReferralDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { getReferralById, updateReferralStatus, completeReferral } = useReferrals();
+  const { getReferralById, updateReferralStatus, loading } = useReferrals();
   
   const [actionReason, setActionReason] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentAction, setCurrentAction] = useState<'accept' | 'reject' | 'more_info' | 'complete' | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   if (!currentUser || !id) return null;
 
   const referral = getReferralById(id);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navigation />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   if (!referral) {
     return (
@@ -60,37 +73,37 @@ const ReferralDetail = () => {
   }
 
   const isReceivingHospital = referral.toHospitalId === currentUser.hospital_id;
-  const isSendingHospital = referral.fromHospitalId === currentUser.hospital_id;
   const canTakeAction = isReceivingHospital && (referral.status === 'pending' || referral.status === 'accepted' || referral.status === 'in_treatment');
 
-  const handleAction = (action: 'accept' | 'reject' | 'more_info' | 'complete') => {
+  const handleAction = async (action: 'accept' | 'reject' | 'more_info' | 'complete') => {
     setCurrentAction(action);
     if (action === 'accept') {
-      updateReferralStatus(referral.id, 'accepted', currentUser.full_name);
-      toast.success('Referral accepted');
+      setIsUpdating(true);
+      await updateReferralStatus(referral.id, 'accepted');
+      setIsUpdating(false);
     } else {
       setDialogOpen(true);
     }
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!currentAction) return;
+
+    setIsUpdating(true);
 
     switch (currentAction) {
       case 'reject':
-        updateReferralStatus(referral.id, 'rejected', currentUser.full_name, actionReason);
-        toast.success('Referral rejected');
+        await updateReferralStatus(referral.id, 'rejected', actionReason);
         break;
       case 'more_info':
-        updateReferralStatus(referral.id, 'more_info_requested', currentUser.full_name, actionReason);
-        toast.success('Additional information requested');
+        await updateReferralStatus(referral.id, 'more_info_requested', actionReason);
         break;
       case 'complete':
-        completeReferral(referral.id, currentUser.full_name, actionReason);
-        toast.success('Treatment marked as complete. Patient code generated!');
+        await updateReferralStatus(referral.id, 'completed', actionReason);
         break;
     }
 
+    setIsUpdating(false);
     setDialogOpen(false);
     setActionReason('');
     setCurrentAction(null);
@@ -103,9 +116,10 @@ const ReferralDetail = () => {
     }
   };
 
-  const startTreatment = () => {
-    updateReferralStatus(referral.id, 'in_treatment', currentUser.full_name, 'Treatment started');
-    toast.success('Treatment started');
+  const startTreatment = async () => {
+    setIsUpdating(true);
+    await updateReferralStatus(referral.id, 'in_treatment', 'Treatment started');
+    setIsUpdating(false);
   };
 
   return (
@@ -194,14 +208,6 @@ const ReferralDetail = () => {
                     </p>
                   </div>
                 )}
-                {referral.moreInfoRequest && (
-                  <div>
-                    <h4 className="font-medium text-warning mb-2">Additional Information Requested</h4>
-                    <p className="text-muted-foreground text-sm bg-warning/10 p-3 rounded-lg border border-warning/20">
-                      {referral.moreInfoRequest}
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
 
@@ -285,14 +291,16 @@ const ReferralDetail = () => {
                       <Button 
                         className="w-full" 
                         onClick={() => handleAction('accept')}
+                        disabled={isUpdating}
                       >
-                        <CheckCircle className="w-4 h-4 mr-2" />
+                        {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                         Accept Referral
                       </Button>
                       <Button 
                         variant="outline" 
                         className="w-full"
                         onClick={() => handleAction('more_info')}
+                        disabled={isUpdating}
                       >
                         <MessageSquare className="w-4 h-4 mr-2" />
                         Request More Info
@@ -301,6 +309,7 @@ const ReferralDetail = () => {
                         variant="destructive" 
                         className="w-full"
                         onClick={() => handleAction('reject')}
+                        disabled={isUpdating}
                       >
                         <XCircle className="w-4 h-4 mr-2" />
                         Reject Referral
@@ -311,7 +320,9 @@ const ReferralDetail = () => {
                     <Button 
                       className="w-full" 
                       onClick={startTreatment}
+                      disabled={isUpdating}
                     >
+                      {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                       Start Treatment
                     </Button>
                   )}
@@ -319,8 +330,9 @@ const ReferralDetail = () => {
                     <Button 
                       className="w-full bg-success hover:bg-success/90" 
                       onClick={() => handleAction('complete')}
+                      disabled={isUpdating}
                     >
-                      <CheckCircle className="w-4 h-4 mr-2" />
+                      {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                       Mark as Complete
                     </Button>
                   )}
@@ -358,13 +370,15 @@ const ReferralDetail = () => {
               rows={4}
             />
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isUpdating}>
                 Cancel
               </Button>
               <Button 
                 onClick={confirmAction}
                 variant={currentAction === 'reject' ? 'destructive' : 'default'}
+                disabled={isUpdating}
               >
+                {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
                 Confirm
               </Button>
             </div>
