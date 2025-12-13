@@ -11,10 +11,13 @@ import {
   ArrowRight,
   FileText,
   Activity,
-  Loader2
+  Loader2,
+  Shield,
+  AlertTriangle
 } from 'lucide-react';
 import ReferralCard from '@/components/ReferralCard';
 import Navigation from '@/components/Navigation';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
@@ -22,21 +25,30 @@ const Dashboard = () => {
 
   if (!currentUser) return null;
 
-  const sentReferrals = referrals.filter(r => r.fromHospitalId === currentUser.hospital_id);
-  const incomingReferrals = referrals.filter(r => r.toHospitalId === currentUser.hospital_id);
+  const isAdmin = currentUser.role === 'admin';
+  const hasHospital = !!currentUser.hospital_id;
+
+  // For admins, show all referrals; for doctors, show only their hospital's referrals
+  const sentReferrals = isAdmin 
+    ? referrals 
+    : referrals.filter(r => r.fromHospitalId === currentUser.hospital_id);
+  const incomingReferrals = isAdmin 
+    ? referrals 
+    : referrals.filter(r => r.toHospitalId === currentUser.hospital_id);
   
   const pendingIncoming = incomingReferrals.filter(r => r.status === 'pending');
   const inTreatment = incomingReferrals.filter(r => r.status === 'in_treatment' || r.status === 'accepted');
   const completed = [...sentReferrals, ...incomingReferrals].filter(r => r.status === 'completed');
 
   const stats = [
-    { label: 'Sent Referrals', value: sentReferrals.length, icon: Send, color: 'text-primary' },
+    { label: isAdmin ? 'Total Referrals' : 'Sent Referrals', value: sentReferrals.length, icon: Send, color: 'text-primary' },
     { label: 'Pending Review', value: pendingIncoming.length, icon: Clock, color: 'text-warning' },
     { label: 'In Treatment', value: inTreatment.length, icon: Activity, color: 'text-info' },
     { label: 'Completed', value: completed.length, icon: CheckCircle, color: 'text-success' },
   ];
 
   const recentReferrals = [...sentReferrals, ...incomingReferrals]
+    .filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i) // Remove duplicates
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .slice(0, 3);
 
@@ -58,30 +70,68 @@ const Dashboard = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8 animate-fade-in">
-          <h1 className="text-2xl font-bold text-foreground">
-            Welcome back, {currentUser.full_name.split(' ')[1] || currentUser.full_name}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground">
+              Welcome back, {currentUser.full_name.split(' ')[1] || currentUser.full_name}
+            </h1>
+            {isAdmin && (
+              <span className="bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">
+                <Shield className="w-3 h-3" />
+                Admin
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground mt-1">
-            {currentUser.hospital_name || 'No hospital'} • {currentUser.specialty || 'General'}
+            {currentUser.hospital_name || 'System Administrator'} • {currentUser.specialty || (isAdmin ? 'All Hospitals' : 'General')}
           </p>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <Link to="/create-referral">
-            <Card className="card-elevated hover:shadow-lg transition-all duration-200 cursor-pointer group">
+        {/* Warning for doctors without hospital */}
+        {!isAdmin && !hasHospital && (
+          <Alert className="mb-6 border-warning bg-warning/10">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <AlertDescription className="text-warning">
+              You are not assigned to a hospital. Please contact an administrator to be assigned before creating referrals.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Admin Quick Action */}
+        {isAdmin && (
+          <Link to="/admin" className="block mb-4">
+            <Card className="card-elevated hover:shadow-lg transition-all duration-200 cursor-pointer group border-primary/20 bg-primary/5">
               <CardContent className="p-6 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <Send className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
+                  <Shield className="w-6 h-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="font-semibold text-foreground">Create New Referral</h3>
-                  <p className="text-sm text-muted-foreground">Send a patient to another hospital</p>
+                  <h3 className="font-semibold text-foreground">Admin Dashboard</h3>
+                  <p className="text-sm text-muted-foreground">Manage hospitals, doctors, and view all referrals</p>
                 </div>
                 <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </CardContent>
             </Card>
           </Link>
+        )}
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {hasHospital && (
+            <Link to="/create-referral">
+              <Card className="card-elevated hover:shadow-lg transition-all duration-200 cursor-pointer group">
+                <CardContent className="p-6 flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                    <Send className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-foreground">Create New Referral</h3>
+                    <p className="text-sm text-muted-foreground">Send a patient to another hospital</p>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                </CardContent>
+              </Card>
+            </Link>
+          )}
 
           <Link to="/incoming-referrals">
             <Card className="card-elevated hover:shadow-lg transition-all duration-200 cursor-pointer group">

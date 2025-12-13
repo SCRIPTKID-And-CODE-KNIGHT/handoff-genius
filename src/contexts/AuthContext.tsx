@@ -141,7 +141,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     if (data.user) {
-      // Create profile
+      // Create profile - role is assigned by database trigger
       const { error: profileError } = await supabase.from('profiles').insert({
         id: data.user.id,
         email,
@@ -153,16 +153,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (profileError) {
         console.error('Profile creation error:', profileError);
         return { error: 'Account created but profile setup failed. Please contact support.' };
-      }
-
-      // Add default doctor role
-      const { error: roleError } = await supabase.from('user_roles').insert({
-        user_id: data.user.id,
-        role: 'doctor',
-      });
-
-      if (roleError) {
-        console.error('Role assignment error:', roleError);
       }
     }
 
