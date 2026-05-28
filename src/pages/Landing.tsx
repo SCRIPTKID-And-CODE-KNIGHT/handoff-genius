@@ -4,7 +4,10 @@ import LandingNav from "@/components/landing/LandingNav";
 import HeroSection from "@/components/landing/HeroSection";
 import FeaturesSection from "@/components/landing/FeaturesSection";
 import HowItWorksSection from "@/components/landing/HowItWorksSection";
+import PricingSection from "@/components/landing/PricingSection";
+import RequestDemoSection from "@/components/landing/RequestDemoSection";
 import CTASection from "@/components/landing/CTASection";
+import SiteFooter from "@/components/landing/SiteFooter";
 
 const Landing = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -24,13 +27,10 @@ const Landing = () => {
       <HeroSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <PricingSection />
+      <RequestDemoSection />
       <CTASection />
-
-      <footer className="py-8 border-t border-border bg-card">
-        <div className="container mx-auto px-4 text-center text-muted-foreground text-sm">
-          <p>© {new Date().getFullYear()} Hospital Flow. Hospital Referral Management System.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };
