@@ -12,6 +12,8 @@ const LandingNav = () => {
   const links: { label: string; href: string; isRoute?: boolean }[] = [
     { label: "Features", href: "#features" },
     { label: "How It Works", href: "#how-it-works" },
+    { label: "Pricing", href: "#pricing" },
+    { label: "Request Demo", href: "#request-demo" },
   ];
 
   const handleClick = (l: { href: string; isRoute?: boolean }) => {
