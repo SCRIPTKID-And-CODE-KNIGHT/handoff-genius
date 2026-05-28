@@ -23,9 +23,13 @@ import {
   CheckCircle,
   AlertTriangle,
   Loader2,
-  Shield
+  Shield,
+  BarChart3,
+  Megaphone
 } from 'lucide-react';
 import SecurityLogViewer from '@/components/SecurityLogViewer';
+import AdminInsights from '@/components/admin/AdminInsights';
+import AdminBroadcast from '@/components/admin/AdminBroadcast';
 
 import { Navigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
@@ -387,24 +391,40 @@ const AdminDashboard = () => {
 
         {/* Main Tabs */}
         <Tabs defaultValue="referrals" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 lg:w-auto lg:inline-flex">
             <TabsTrigger value="referrals" className="gap-2">
               <FileText className="w-4 h-4" />
-              Referrals
+              <span className="hidden sm:inline">Referrals</span>
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="gap-2">
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Insights</span>
+            </TabsTrigger>
+            <TabsTrigger value="broadcast" className="gap-2">
+              <Megaphone className="w-4 h-4" />
+              <span className="hidden sm:inline">Broadcast</span>
             </TabsTrigger>
             <TabsTrigger value="hospitals" className="gap-2">
               <Building2 className="w-4 h-4" />
-              Hospitals
+              <span className="hidden sm:inline">Hospitals</span>
             </TabsTrigger>
             <TabsTrigger value="doctors" className="gap-2">
               <Users className="w-4 h-4" />
-              Doctors
+              <span className="hidden sm:inline">Doctors</span>
             </TabsTrigger>
             <TabsTrigger value="security" className="gap-2">
               <Shield className="w-4 h-4" />
-              Security
+              <span className="hidden sm:inline">Security</span>
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="insights" className="space-y-4">
+            <AdminInsights referrals={referrals} hospitals={hospitals} />
+          </TabsContent>
+
+          <TabsContent value="broadcast" className="space-y-4">
+            <AdminBroadcast doctors={doctors} hospitals={hospitals} />
+          </TabsContent>
 
           {/* All Referrals Tab */}
           <TabsContent value="referrals" className="space-y-4">
