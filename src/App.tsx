@@ -24,9 +24,6 @@ import PatientFollowups from "./pages/PatientFollowups";
 import Messages from "./pages/Messages";
 import ProfileSettings from "./pages/ProfileSettings";
 import NotFound from "./pages/NotFound";
-import PatientIntake from "./pages/PatientIntake";
-import QueueDashboard from "./pages/QueueDashboard";
-import DoctorQueue from "./pages/DoctorQueue";
 
 const queryClient = new QueryClient();
 
@@ -43,9 +40,6 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
-            <Route path="/patient-intake" element={<PatientIntake />} />
-            <Route path="/queue-status" element={<QueueDashboard />} />
-            <Route path="/doctor-queue" element={<DoctorQueue />} />
             <Route
               path="/dashboard"
               element={
