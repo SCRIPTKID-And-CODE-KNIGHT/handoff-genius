@@ -265,7 +265,7 @@ export const useReferrals = () => {
     if (!currentUser) return false;
 
     try {
-      const updateData: Record<string, unknown> = { status };
+      const updateData: Database['public']['Tables']['referrals']['Update'] = { status };
       if (status === 'rejected' && details) {
         updateData.rejection_reason = details;
       }
