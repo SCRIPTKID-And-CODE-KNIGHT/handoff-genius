@@ -14,7 +14,7 @@ export const useVoice = (options: UseVoiceOptions = {}) => {
   const [voicesLoaded, setVoicesLoaded] = useState(false);
   const recognitionRef = useRef<any>(null);
   const onTranscriptRef = useRef(onTranscript);
-  const speakingCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const speakingCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Keep callback ref updated
   useEffect(() => {

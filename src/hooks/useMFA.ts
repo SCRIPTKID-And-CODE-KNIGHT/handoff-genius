@@ -70,8 +70,8 @@ export const useMFA = () => {
           status: f.status,
           created_at: f.created_at,
         })),
-        currentLevel,
-        nextLevel,
+        currentLevel: currentLevel as 'aal1' | 'aal2',
+        nextLevel: nextLevel as 'aal1' | 'aal2',
         loading: false,
         needsVerification,
       });
