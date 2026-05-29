@@ -71,6 +71,39 @@ export type Database = {
         }
         Relationships: []
       }
+      demo_requests: {
+        Row: {
+          created_at: string
+          email: string
+          hospital: string
+          id: string
+          name: string
+          phone: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          hospital: string
+          id?: string
+          name: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          hospital?: string
+          id?: string
+          name?: string
+          phone?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       direct_messages: {
         Row: {
           created_at: string
