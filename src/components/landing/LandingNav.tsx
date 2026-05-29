@@ -11,11 +11,10 @@ const LandingNav = () => {
 
   const links: { label: string; href: string; isRoute?: boolean }[] = [
     { label: "Features", href: "#features" },
-  const links: { label: string; href: string; isRoute?: boolean }[] = [
-    { label: "Features", href: "#features" },
     { label: "Pricing", href: "#pricing" },
     { label: "Request Demo", href: "#request-demo" },
   ];
+
 
   const handleClick = (l: { href: string; isRoute?: boolean }) => {
     setMobileOpen(false);
