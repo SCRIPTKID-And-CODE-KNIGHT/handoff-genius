@@ -12,6 +12,15 @@ export interface UserProfile {
   role: 'doctor' | 'admin';
 }
 
+type ProfileWithHospital = {
+  id: string;
+  full_name: string;
+  email: string;
+  hospital_id: string | null;
+  specialty: string | null;
+  hospitals: { name: string } | null;
+};
+
 export interface MFAChallenge {
   factorId: string;
   onVerified: () => void;
@@ -75,7 +84,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         full_name: profile.full_name,
         email: profile.email,
         hospital_id: profile.hospital_id,
-        hospital_name: (profile.hospitals as any)?.name || undefined,
+        hospital_name: (profile as ProfileWithHospital).hospitals?.name || undefined,
         specialty: profile.specialty,
         role: userRole,
       };
