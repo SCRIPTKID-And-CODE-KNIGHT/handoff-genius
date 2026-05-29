@@ -31,10 +31,6 @@ const Login = () => {
   const { login, signup, isAuthenticated, currentUser } = useAuth();
   const navigate = useNavigate();
 
-  const routeAfterLogin = () => {
-    navigate(currentUser?.role === 'admin' ? '/admin' : '/dashboard');
-  };
-
   useEffect(() => {
     if (isAuthenticated && currentUser) {
       navigate(currentUser.role === 'admin' ? '/admin' : '/dashboard');
@@ -65,7 +61,6 @@ const Login = () => {
       setMfaRequired(true);
     } else {
       toast.success('Welcome back!');
-      routeAfterLogin();
     }
   };
 
@@ -73,7 +68,6 @@ const Login = () => {
     setMfaRequired(false);
     setMfaFactorId(null);
     toast.success('Welcome back!');
-    routeAfterLogin();
   };
 
   const handleMfaCancel = async () => {
