@@ -34,12 +34,10 @@ import AdminBroadcast from '@/components/admin/AdminBroadcast';
 import { Navigate } from 'react-router-dom';
 import { Database } from '@/integrations/supabase/types';
 
-type DbHospital = Database['public']['Tables']['hospitals']['Row'];
+type Hospital = Database['public']['Tables']['hospitals']['Row'];
 type DbProfile = Database['public']['Tables']['profiles']['Row'];
 type DbReferral = Database['public']['Tables']['referrals']['Row'];
 type DbUserRole = Database['public']['Tables']['user_roles']['Row'];
-
-interface Hospital extends DbHospital {}
 
 interface Profile extends DbProfile {
   hospital_name?: string;

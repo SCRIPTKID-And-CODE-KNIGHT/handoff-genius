@@ -5,6 +5,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Calendar, CheckCircle2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { z } from "zod";
+
+const demoRequestSchema = z.object({
+  name: z.string().trim().min(2, "Full name is required").max(120),
+  hospital: z.string().trim().min(2, "Hospital / facility is required").max(160),
+  email: z.string().trim().email("Please enter a valid work email").max(255),
+  phone: z.string().trim().max(40).optional(),
+});
 
 const RequestDemoSection = () => {
   const [submitted, setSubmitted] = useState(false);
@@ -14,13 +23,35 @@ const RequestDemoSection = () => {
     email: "",
     phone: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name || !form.hospital || !form.email) {
-      toast({ title: "Please fill in required fields", variant: "destructive" });
+
+    const parsed = demoRequestSchema.safeParse(form);
+    if (!parsed.success) {
+      toast({ title: parsed.error.errors[0]?.message || "Please fill in required fields", variant: "destructive" });
       return;
     }
+
+    setIsSubmitting(true);
+    const { error } = await supabase.from("demo_requests").insert({
+      name: parsed.data.name,
+      hospital: parsed.data.hospital,
+      email: parsed.data.email,
+      phone: parsed.data.phone || null,
+    });
+    setIsSubmitting(false);
+
+    if (error) {
+      toast({
+        title: "Demo request could not be saved",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSubmitted(true);
     toast({
       title: "Demo request received",
@@ -125,9 +156,9 @@ const RequestDemoSection = () => {
                         placeholder="+1 555 000 0000"
                       />
                     </div>
-                    <Button type="submit" size="lg" className="w-full gap-2">
+                    <Button type="submit" size="lg" className="w-full gap-2" disabled={isSubmitting}>
                       <Calendar className="w-4 h-4" />
-                      Schedule My Demo
+                      {isSubmitting ? "Saving request..." : "Schedule My Demo"}
                     </Button>
                     <p className="text-xs text-muted-foreground text-center">
                       We'll respond within 24 hours to confirm your slot.

@@ -28,14 +28,14 @@ const Login = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
-  const { login, signup, isAuthenticated } = useAuth();
+  const { login, signup, isAuthenticated, currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/dashboard');
+    if (isAuthenticated && currentUser) {
+      navigate(currentUser.role === 'admin' ? '/admin' : '/dashboard');
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, currentUser, navigate]);
 
   useEffect(() => {
     const fetchHospitals = async () => {
@@ -61,7 +61,6 @@ const Login = () => {
       setMfaRequired(true);
     } else {
       toast.success('Welcome back!');
-      navigate('/dashboard');
     }
   };
 
@@ -69,7 +68,6 @@ const Login = () => {
     setMfaRequired(false);
     setMfaFactorId(null);
     toast.success('Welcome back!');
-    navigate('/dashboard');
   };
 
   const handleMfaCancel = async () => {

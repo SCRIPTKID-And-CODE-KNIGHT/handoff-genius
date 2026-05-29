@@ -12,6 +12,15 @@ export interface UserProfile {
   role: 'doctor' | 'admin';
 }
 
+type ProfileWithHospital = {
+  id: string;
+  full_name: string;
+  email: string;
+  hospital_id: string | null;
+  specialty: string | null;
+  hospitals: { name: string } | null;
+};
+
 export interface MFAChallenge {
   factorId: string;
   onVerified: () => void;
@@ -40,13 +49,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
   const [mfaChallenge, setMfaChallenge] = useState<MFAChallenge | null>(null);
 
-  const fetchUserProfile = async (userId: string) => {
+  const fetchUserProfile = async (authUser: User) => {
     try {
       // Fetch profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*, hospitals(name)')
-        .eq('id', userId)
+        .eq('id', authUser.id)
         .maybeSingle();
 
       if (profileError) {
@@ -54,13 +63,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return null;
       }
 
-      if (!profile) return null;
-
       // Fetch roles (user may have multiple, prioritize admin)
       const { data: rolesData, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
-        .eq('user_id', userId);
+        .eq('user_id', authUser.id);
 
       if (roleError) {
         console.error('Error fetching role:', roleError);
@@ -70,12 +77,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const isAdmin = rolesData?.some(r => r.role === 'admin');
       const userRole = isAdmin ? 'admin' : (rolesData?.[0]?.role as 'doctor' | 'admin') || 'doctor';
 
+      if (!profile) {
+        return {
+          id: authUser.id,
+          full_name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Hospital Flow User',
+          email: authUser.email || '',
+          hospital_id: null,
+          hospital_name: undefined,
+          specialty: null,
+          role: userRole,
+        };
+      }
+
       const userProfile: UserProfile = {
         id: profile.id,
         full_name: profile.full_name,
         email: profile.email,
         hospital_id: profile.hospital_id,
-        hospital_name: (profile.hospitals as any)?.name || undefined,
+        hospital_name: (profile as ProfileWithHospital).hospitals?.name || undefined,
         specialty: profile.specialty,
         role: userRole,
       };
@@ -97,7 +116,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // Defer profile fetch with setTimeout to avoid deadlock
         if (session?.user) {
           setTimeout(() => {
-            fetchUserProfile(session.user.id).then(setCurrentUser);
+            fetchUserProfile(session.user).then(setCurrentUser);
           }, 0);
         } else {
           setCurrentUser(null);
@@ -111,7 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        fetchUserProfile(session.user.id).then((profile) => {
+        fetchUserProfile(session.user).then((profile) => {
           setCurrentUser(profile);
           setIsLoading(false);
         });
