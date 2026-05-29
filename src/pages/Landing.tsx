@@ -26,7 +26,6 @@ const Landing = () => {
       <LandingNav />
       <HeroSection />
       <FeaturesSection />
-      <HowItWorksSection />
       <PricingSection />
       <RequestDemoSection />
       <CTASection />
