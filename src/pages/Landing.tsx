@@ -3,7 +3,7 @@ import AmbulanceLoader from "@/components/AmbulanceLoader";
 import LandingNav from "@/components/landing/LandingNav";
 import HeroSection from "@/components/landing/HeroSection";
 import FeaturesSection from "@/components/landing/FeaturesSection";
-import HowItWorksSection from "@/components/landing/HowItWorksSection";
+
 import PricingSection from "@/components/landing/PricingSection";
 import RequestDemoSection from "@/components/landing/RequestDemoSection";
 import CTASection from "@/components/landing/CTASection";
@@ -26,7 +26,6 @@ const Landing = () => {
       <LandingNav />
       <HeroSection />
       <FeaturesSection />
-      <HowItWorksSection />
       <PricingSection />
       <RequestDemoSection />
       <CTASection />

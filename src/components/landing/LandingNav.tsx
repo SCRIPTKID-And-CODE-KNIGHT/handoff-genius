@@ -11,10 +11,10 @@ const LandingNav = () => {
 
   const links: { label: string; href: string; isRoute?: boolean }[] = [
     { label: "Features", href: "#features" },
-    { label: "How It Works", href: "#how-it-works" },
     { label: "Pricing", href: "#pricing" },
     { label: "Request Demo", href: "#request-demo" },
   ];
+
 
   const handleClick = (l: { href: string; isRoute?: boolean }) => {
     setMobileOpen(false);
@@ -49,14 +49,7 @@ const LandingNav = () => {
           ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-3">
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/login">Sign In</Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link to="/login">Get Started</Link>
-          </Button>
-        </div>
+        <div className="hidden md:flex items-center gap-3" />
 
         {/* Mobile toggle */}
         <Button

@@ -141,18 +141,22 @@ const AdminDashboard = () => {
     fetchData();
   }, []);
 
-  // Redirect if not admin
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
+  // Wait for auth + profile to load before deciding access
+  if (authLoading || (currentUser === null && !!supabase)) {
+    // If auth is still loading OR session exists but profile not yet hydrated
+    if (authLoading || !currentUser) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
   }
 
   if (currentUser?.role !== 'admin') {
     return <Navigate to="/dashboard" replace />;
   }
+
 
   // Statistics
   const stats = {
