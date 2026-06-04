@@ -494,6 +494,11 @@ const ReferralDetail = () => {
               </CardContent>
             </Card>
 
+            <ForwardingChain
+              originHospital={forwards[0]?.fromHospitalName || referral.toHospitalName}
+              forwards={forwards}
+            />
+
             {/* Dates */}
             <Card className="card-elevated">
               <CardContent className="pt-6 space-y-3">
