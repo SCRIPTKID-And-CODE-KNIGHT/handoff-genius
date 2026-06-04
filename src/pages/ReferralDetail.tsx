@@ -582,8 +582,6 @@ const ReferralDetail = () => {
                       Mark as Complete
                     </Button>
                   )}
-                  {(referral.status === 'pending' || referral.status === 'accepted') &&
-                    (referral as any).forward_count === undefined ? null : null}
                   {(referral.status === 'pending' || referral.status === 'accepted') && (
                     <ForwardReferralDialog
                       excludeHospitalIds={Array.from(
