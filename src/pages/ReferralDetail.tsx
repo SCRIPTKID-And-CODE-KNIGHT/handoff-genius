@@ -45,6 +45,7 @@ const ReferralDetail = () => {
   const { getReferralById, updateReferralStatus, loading } = useReferrals();
   const { attachments, loading: attachmentsLoading, uploading, uploadFile, deleteAttachment, getDownloadUrl } = useReferralAttachments(id);
   const { messages, loading: messagesLoading, sending, sendMessage } = useReferralMessages(id);
+  const { forwards, submitting: forwarding, forwardReferral } = useReferralForwards(id);
   
   const [actionReason, setActionReason] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
