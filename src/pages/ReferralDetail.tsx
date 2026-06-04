@@ -4,7 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useReferralAttachments } from '@/hooks/useReferralAttachments';
 import { useReferralMessages } from '@/hooks/useReferralMessages';
+import { useReferralForwards } from '@/hooks/useReferralForwards';
 import Navigation from '@/components/Navigation';
+import { ForwardReferralDialog } from '@/components/ForwardReferralDialog';
+import { ForwardingChain } from '@/components/ForwardingChain';
 import { StatusBadge, UrgencyBadge } from '@/components/StatusBadge';
 import ActivityTimeline from '@/components/ActivityTimeline';
 import { FileUploadZone } from '@/components/FileUploadZone';
@@ -42,6 +45,7 @@ const ReferralDetail = () => {
   const { getReferralById, updateReferralStatus, loading } = useReferrals();
   const { attachments, loading: attachmentsLoading, uploading, uploadFile, deleteAttachment, getDownloadUrl } = useReferralAttachments(id);
   const { messages, loading: messagesLoading, sending, sendMessage } = useReferralMessages(id);
+  const { forwards, submitting: forwarding, forwardReferral } = useReferralForwards(id);
   
   const [actionReason, setActionReason] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -490,6 +494,11 @@ const ReferralDetail = () => {
               </CardContent>
             </Card>
 
+            <ForwardingChain
+              originHospital={forwards[0]?.fromHospitalName || referral.toHospitalName}
+              forwards={forwards}
+            />
+
             {/* Dates */}
             <Card className="card-elevated">
               <CardContent className="pt-6 space-y-3">
@@ -572,6 +581,19 @@ const ReferralDetail = () => {
                       {isUpdating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
                       Mark as Complete
                     </Button>
+                  )}
+                  {(referral.status === 'pending' || referral.status === 'accepted') && (
+                    <ForwardReferralDialog
+                      excludeHospitalIds={Array.from(
+                        new Set([
+                          referral.fromHospitalId,
+                          referral.toHospitalId,
+                          ...forwards.flatMap(f => [f.from_hospital_id, f.to_hospital_id]),
+                        ])
+                      )}
+                      submitting={forwarding}
+                      onForward={forwardReferral}
+                    />
                   )}
                 </CardContent>
               </Card>
