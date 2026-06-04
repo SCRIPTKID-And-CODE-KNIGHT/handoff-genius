@@ -157,11 +157,24 @@ const ReferralDetail = () => {
       return;
     }
 
+    const esc = (val: unknown): string => {
+      if (val === null || val === undefined) return '';
+      return String(val)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    };
+
+    const statusLabel = referral.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const urgencyLabel = referral.urgency.charAt(0).toUpperCase() + referral.urgency.slice(1);
+
     const printContent = `
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Referral - ${referral.patient.name}</title>
+        <title>Referral - ${esc(referral.patient.name)}</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 40px; color: #111; }
@@ -200,23 +213,23 @@ const ReferralDetail = () => {
           </div>
           <div class="ids">
             <p>Referral ID</p>
-            <p class="code">${referral.id.slice(0, 8).toUpperCase()}</p>
-            ${referral.patientCode ? `<p style="margin-top: 8px;">Patient Code</p><p class="code">${referral.patientCode}</p>` : ''}
+            <p class="code">${esc(referral.id.slice(0, 8).toUpperCase())}</p>
+            ${referral.patientCode ? `<p style="margin-top: 8px;">Patient Code</p><p class="code">${esc(referral.patientCode)}</p>` : ''}
           </div>
         </div>
 
         <div class="badges">
-          <span class="badge badge-status">Status: ${referral.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
-          <span class="badge badge-${referral.urgency}">Urgency: ${referral.urgency.charAt(0).toUpperCase() + referral.urgency.slice(1)}</span>
+          <span class="badge badge-status">Status: ${esc(statusLabel)}</span>
+          <span class="badge badge-${esc(referral.urgency)}">Urgency: ${esc(urgencyLabel)}</span>
         </div>
 
         <section>
           <h2>Patient Information</h2>
           <div class="grid">
-            <div class="field"><label>Name</label><p>${referral.patient.name}</p></div>
-            <div class="field"><label>Age</label><p>${referral.patient.age} years</p></div>
-            <div class="field"><label>Contact</label><p>${referral.patient.contact}</p></div>
-            <div class="field"><label>Medical ID</label><p>${referral.patient.medicalId}</p></div>
+            <div class="field"><label>Name</label><p>${esc(referral.patient.name)}</p></div>
+            <div class="field"><label>Age</label><p>${esc(referral.patient.age)} years</p></div>
+            <div class="field"><label>Contact</label><p>${esc(referral.patient.contact)}</p></div>
+            <div class="field"><label>Medical ID</label><p>${esc(referral.patient.medicalId)}</p></div>
           </div>
         </section>
 
@@ -225,36 +238,36 @@ const ReferralDetail = () => {
           <div class="route">
             <div class="route-item route-from">
               <label style="font-size: 12px; color: #666; text-transform: uppercase;">Referring Hospital</label>
-              <p style="font-weight: 500;">${referral.fromHospitalName}</p>
-              <p style="color: #666;">${referral.fromDoctorName}</p>
+              <p style="font-weight: 500;">${esc(referral.fromHospitalName)}</p>
+              <p style="color: #666;">${esc(referral.fromDoctorName)}</p>
             </div>
             <div class="route-item route-to">
               <label style="font-size: 12px; color: #666; text-transform: uppercase;">Receiving Hospital</label>
-              <p style="font-weight: 500;">${referral.toHospitalName}</p>
-              <p style="color: #666;">${referral.assignedDoctorName || 'Awaiting assignment'}</p>
+              <p style="font-weight: 500;">${esc(referral.toHospitalName)}</p>
+              <p style="color: #666;">${esc(referral.assignedDoctorName || 'Awaiting assignment')}</p>
             </div>
           </div>
         </section>
 
         <section>
           <h2>Specialty Required</h2>
-          <p style="font-weight: 500;">${referral.specialty}</p>
+          <p style="font-weight: 500;">${esc(referral.specialty)}</p>
         </section>
 
         <section>
           <h2>Medical Information</h2>
           <div style="margin-bottom: 16px;">
             <label style="font-size: 12px; color: #666; display: block; margin-bottom: 4px;">Medical Summary</label>
-            <div class="text-box">${referral.medicalSummary}</div>
+            <div class="text-box">${esc(referral.medicalSummary)}</div>
           </div>
           <div>
             <label style="font-size: 12px; color: #666; display: block; margin-bottom: 4px;">Reason for Referral</label>
-            <div class="text-box">${referral.reasonForReferral}</div>
+            <div class="text-box">${esc(referral.reasonForReferral)}</div>
           </div>
           ${referral.rejectionReason ? `
             <div style="margin-top: 16px;">
               <label style="font-size: 12px; color: #dc2626; display: block; margin-bottom: 4px;">Rejection Reason</label>
-              <div class="text-box error">${referral.rejectionReason}</div>
+              <div class="text-box error">${esc(referral.rejectionReason)}</div>
             </div>
           ` : ''}
         </section>
@@ -262,13 +275,13 @@ const ReferralDetail = () => {
         <section>
           <h2>Timeline</h2>
           <div class="grid">
-            <div class="field"><label>Created</label><p>${format(new Date(referral.createdAt), 'MMMM d, yyyy h:mm a')}</p></div>
-            <div class="field"><label>Last Updated</label><p>${format(new Date(referral.updatedAt), 'MMMM d, yyyy h:mm a')}</p></div>
+            <div class="field"><label>Created</label><p>${esc(format(new Date(referral.createdAt), 'MMMM d, yyyy h:mm a'))}</p></div>
+            <div class="field"><label>Last Updated</label><p>${esc(format(new Date(referral.updatedAt), 'MMMM d, yyyy h:mm a'))}</p></div>
           </div>
         </section>
 
         <footer>
-          <p>This document was generated from Hospital Flow on ${format(new Date(), 'MMMM d, yyyy h:mm a')}</p>
+          <p>This document was generated from Hospital Flow on ${esc(format(new Date(), 'MMMM d, yyyy h:mm a'))}</p>
           <p style="margin-top: 4px;">This is an official medical referral document. Please handle with confidentiality.</p>
         </footer>
       </body>
