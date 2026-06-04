@@ -417,6 +417,58 @@ export type Database = {
           },
         ]
       }
+      referral_forwards: {
+        Row: {
+          created_at: string
+          forwarded_by: string
+          from_hospital_id: string
+          id: string
+          reason: string
+          referral_id: string
+          to_hospital_id: string
+        }
+        Insert: {
+          created_at?: string
+          forwarded_by: string
+          from_hospital_id: string
+          id?: string
+          reason: string
+          referral_id: string
+          to_hospital_id: string
+        }
+        Update: {
+          created_at?: string
+          forwarded_by?: string
+          from_hospital_id?: string
+          id?: string
+          reason?: string
+          referral_id?: string
+          to_hospital_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_forwards_from_hospital_id_fkey"
+            columns: ["from_hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_forwards_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_forwards_to_hospital_id_fkey"
+            columns: ["to_hospital_id"]
+            isOneToOne: false
+            referencedRelation: "hospitals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       referral_messages: {
         Row: {
           created_at: string
@@ -503,6 +555,7 @@ export type Database = {
           assigned_doctor_id: string | null
           created_at: string
           created_by: string
+          forward_count: number
           from_hospital_id: string
           id: string
           medical_summary: string
@@ -522,6 +575,7 @@ export type Database = {
           assigned_doctor_id?: string | null
           created_at?: string
           created_by: string
+          forward_count?: number
           from_hospital_id: string
           id?: string
           medical_summary: string
@@ -541,6 +595,7 @@ export type Database = {
           assigned_doctor_id?: string | null
           created_at?: string
           created_by?: string
+          forward_count?: number
           from_hospital_id?: string
           id?: string
           medical_summary?: string
@@ -636,6 +691,10 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      user_hospital_in_referral_chain: {
+        Args: { _referral_id: string; _user_id: string }
         Returns: boolean
       }
     }
